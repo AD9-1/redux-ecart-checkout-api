@@ -1,0 +1,20 @@
+const mongoose = require("mongoose");
+require("dotenv").config();
+mongoose
+  .connect(process.env.MONGODB_STRING)
+  .then(() => {
+    console.log("DB Connnected");
+  })
+  .catch((e) => {
+    console.log("Failed to connect", e);
+  });
+
+const userschema = new mongoose.Schema({
+  email: { type: String, unique: true },
+  username: { type: String, required: true },
+  password: { type: String, required: true },
+  cart: { type: Array, required: true},
+  totalAmount: {type: Number, default: 0 }
+});
+const UserRedux = mongoose.model("UsersRedux", userschema);
+module.exports = UserRedux;
