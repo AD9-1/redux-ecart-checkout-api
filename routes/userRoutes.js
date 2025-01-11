@@ -78,20 +78,7 @@ router.get("/signup", async (req, res) => {
         .json({ message: "difficult to fetch data", data: err.message });
     });
 });
-function authorize(req, res, next) {
-  const token = req.headers.authorization.split(" ")[1];
-  if (!token) {
-    return res.status(401).json({ message: "No Token Provided" });
-  } else {
-    jwt.verify(token, key, (err, decoded) => {
-      if (err) {
-        return res.status(403).json({ message: "Invalid or expired token" });
-      }
-      req.decoded = decoded; // Attach decoded data to request object
-      next();
-    });
-  }
-}
+
 router.post("/login", async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) {
@@ -133,24 +120,37 @@ function authorize(req, res, next) {
     });
   }
 }
-router.post("/gotoCart", authorize, async (req, res) => {
-  let { cartItems } = req.body;
-
-  if (!cartItems)
+router.post("/addToCart", authorize, async (req, res) => {
+  let { cartItem } = req.body;
+  console.log("cartItem", cartItem);
+  if (!cartItem)
     return res.status(400).json({ message: "There is nothing in your Cart" });
-  const cart = cartItems;
   console.log("req.decoded.email", req.decoded.email);
 
   try {
-    const totalAmount = cartItems.reduce(
-      (acc, item) => acc + item.quantity * item.price,
+    let existingUser = await userRedux.findOne({ email: req.decoded.email });
+    let itemFlag = false;
+    const existingCart = existingUser?.cart.map((item) => {
+      if (cartItem.id === item.id) {
+        itemFlag = true;
+        return {
+          ...item,
+          quantity: item.quantity + 1,
+        };
+      }
+      return item;
+    });
+    if (itemFlag === false) existingCart.push({ ...cartItem, quantity: 1 });
+    console.log(existingCart);
+    const totalAmount = existingCart.reduce(
+      (acc, item) => acc + item.price * item.quantity,
       0
     );
     let user = await userRedux
       .findOneAndUpdate(
         { email: req.decoded.email },
         {
-          $set: { cart, totalAmount },
+          $set: { cart: existingCart, totalAmount },
         },
         { new: true }
       )
@@ -163,5 +163,61 @@ router.post("/gotoCart", authorize, async (req, res) => {
       .json({ message: "Error occurred while updating cart", data: err });
   }
 });
+router.post("/removeFromCart", authorize, async (req, res) => {
+  let { cartItem } = req.body;
+  if (!cartItem)
+    return res
+      .status(400)
+      .json({ message: "There is nothing in your Cart to remove" });
+  try {
+    let existingUser = await userRedux.findOne({ email: req.decoded.email });
 
+    const existingCart = existingUser?.cart
+      .map((item) => {
+        if (cartItem.id === item.id) {
+          if (item.quantity > 1)
+            return {
+              ...item,
+              quantity: item.quantity - 1,
+            };
+          else if (item.quantity == 1) return;
+        }
+        return item;
+      })
+      .filter(Boolean); //removes undefined element from cart
+
+    const updatedUser=await userRedux.findOneAndUpdate(
+      { email: req.decoded.email },
+      { cart: existingCart },
+      { new: true }
+    );
+
+    return res
+      .status(201)
+      .json({ data:updatedUser.cart, success: "The item removed from cart" });
+  } catch (err) {
+    console.error("Error while updating cart:", err);
+    return res
+      .status(500)
+      .json({ message: "Error occurred while updating cart", data: err });
+  }
+});
+
+router.get("/getCart", authorize, async (req, res) => {
+  try {
+    let cartItems = await userRedux
+      .findOne({ email: req.decoded.email })
+      .populate("cart");
+    if (cartItems.cart.length > 0) {
+      return res.status(200).json({ data: cartItems.cart });
+    } else {
+      return res.status(404).json({ message: "No cart found for this user" });
+    }
+  } catch (err) {
+    console.error("Error while fetching cart:", err);
+    return res
+      .status(500)
+      .json({ message: "Error occurred while fetching cart", data: err });
+  }
+});
 module.exports = router;
