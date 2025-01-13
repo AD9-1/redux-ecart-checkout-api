@@ -38,22 +38,19 @@ router.post("/orderplaced", authorize, async (req, res) => {
       orderItems: cartItems,
       price: totalPrice,
     });
-
-    // clear the cart and totalPrice in userRedux table
-    const userUpdate = await userRedux.findOneAndUpdate(
-      { _id: user._id },
-      { $set: { cart: [], totalAmount: 0 } },
-      { new: true }
-    );
-    console.log("userUpdate", userUpdate);
-    if (!userUpdate) {
-      return res
-        .status(400)
-        .json({ message: "Failed to update userRedux table" });
-    } else {
-      await newOrder.save();
-      return res.status(200).json({ message: "Order placed successfully" });
+    if (user) {
+      await user.findOneAndUpdate(
+        { _id: user._id }, 
+        { 
+          $set: { 
+            cart: [],
+            totalPrice: 0
+          } 
+        }
+      );
     }
+    await newOrder.save();
+    return res.status(200).json({ message: "Order placed successfully" });
   } catch (error) {
     console.error("Error while creating order", error);
     return res
