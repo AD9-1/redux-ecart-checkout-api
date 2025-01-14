@@ -23,8 +23,8 @@ function authorize(req, res, next) {
 router.post("/orderplaced", authorize, async (req, res) => {
   const { cartItems, totalPrice } = req.body;
 
-  if (!cartItems || totalPrice == 0 || !totalPrice)
-    return res.status(400).json({ message: "No order has been placed" });
+  if (!cartItems || totalPrice <= 0 || cartItems.length == 0)
+    return res.status(400).json({ message: "No valid order data provided" });
   const user = await userRedux.findOne({ email: req.decoded.email });
 
   if (!user)
@@ -37,22 +37,23 @@ router.post("/orderplaced", authorize, async (req, res) => {
       username: user.username,
       orderItems: cartItems,
       price: totalPrice,
+      Date: new Date(),
     });
-    if (user) {
-      await user.findOneAndUpdate(
-        { _id: user._id }, 
-        { 
-          $set: { 
-            cart: [],
-            totalPrice: 0
-          } 
-        }
-      );
-    }
+
+    await userRedux.findOneAndUpdate(
+      { _id: user._id },
+      {
+        $set: {
+          cart: [],
+          totalAmount: 0,
+        },
+      }
+    );
+
     await newOrder.save();
     return res.status(200).json({ message: "Order placed successfully" });
   } catch (error) {
-    console.error("Error while creating order", error);
+    console.error("Error while creating order :", error);
     return res
       .status(500)
       .json({ message: "Server error occurred while placing order" });

@@ -10,33 +10,30 @@ router.post("/", async function (req, res) {
   }
   const { products } = req.body;
 
-  try{
-     const lineItems = products.map((product) => ({
-    price_data: {
-      currency: "cad",
-      product_data: {
-        name: product.title,
-        images: [product.image],
+  try {
+    const lineItems = products.map((product) => ({
+      price_data: {
+        currency: "cad",
+        product_data: {
+          name: product.title,
+          images: [product.image],
+        },
+        unit_amount: Math.round(product.price * 100),
       },
-      unit_amount: Math.round(product.price * 100),
-    
-    },
-    quantity: product.quantity,
-  }));
+      quantity: product.quantity,
+    }));
 
-  const session = await stripe.checkout.sessions.create({
-    payment_method_types: ["card"],
-    line_items: lineItems,
-    mode: "payment",
-    success_url: "http://localhost:3000?payment=success",
-    cancel_url: "http://localhost:3000/cancel",
-  });
-  res.json({ id: session.id });}
-  catch(error)
-  {
-    console.error("Stripe error :",error);
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ["card"],
+      line_items: lineItems,
+      mode: "payment",
+      success_url: "http://localhost:3000?payment=success",
+      cancel_url: "http://localhost:3000/cancel",
+    });
+    res.json({ id: session.id });
+  } catch (error) {
+    console.error("Stripe error :", error);
     res.status(500).json({ error: "Server error" });
   }
- 
 });
 module.exports = router;
